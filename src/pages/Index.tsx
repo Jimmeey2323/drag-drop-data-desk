@@ -2,7 +2,8 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Loader2, Zap, CheckCircle2 } from "lucide-react";
 import DropZone from "@/components/DropZone";
-import { processCSVFiles } from "@/lib/csvProcessor";
+import TagConfigModal, { TagRule } from "@/components/TagConfigModal";
+import { processCSVFiles, extractColumnsFromCSVFiles } from "@/lib/csvProcessor";
 import { mergePDFFiles } from "@/lib/pdfProcessor";
 import { toast } from "sonner";
 
@@ -13,13 +14,26 @@ const Index = () => {
   const [pdfProcessing, setPdfProcessing] = useState(false);
   const [csvDone, setCsvDone] = useState(false);
   const [pdfDone, setPdfDone] = useState(false);
+  const [tagModalOpen, setTagModalOpen] = useState(false);
+  const [csvColumns, setCsvColumns] = useState<string[]>([]);
 
-  const handleProcessCSV = async () => {
+  const handleOpenTagModal = async () => {
     if (!csvFiles.length) return;
+    try {
+      const cols = await extractColumnsFromCSVFiles(csvFiles);
+      setCsvColumns(cols);
+    } catch {
+      setCsvColumns([]);
+    }
+    setTagModalOpen(true);
+  };
+
+  const handleTagConfirm = async (rules: TagRule[]) => {
+    setTagModalOpen(false);
     setCsvProcessing(true);
     setCsvDone(false);
     try {
-      await processCSVFiles(csvFiles);
+      await processCSVFiles(csvFiles, rules);
       setCsvDone(true);
       toast.success("CSV processed & downloaded!");
     } catch (e: any) {
@@ -46,7 +60,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
       <header className="border-b border-border/50 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -57,7 +70,6 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main */}
       <main className="flex-1 flex items-start justify-center px-6 py-12">
         <div className="w-full max-w-5xl">
           <motion.div
@@ -66,9 +78,7 @@ const Index = () => {
             transition={{ duration: 0.5 }}
             className="mb-10"
           >
-            <h2 className="text-3xl font-bold tracking-tight mb-2">
-              Process your files
-            </h2>
+            <h2 className="text-3xl font-bold tracking-tight mb-2">Process your files</h2>
             <p className="text-muted-foreground text-sm max-w-lg">
               Upload CSV files to clean & format customer data, or merge multiple PDFs into a single document.
             </p>
@@ -90,7 +100,7 @@ const Index = () => {
                 processing={csvProcessing}
               />
               <button
-                onClick={handleProcessCSV}
+                onClick={handleOpenTagModal}
                 disabled={!csvFiles.length || csvProcessing}
                 className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed bg-[hsl(var(--csv-color))] text-primary-foreground hover:brightness-110 active:scale-[0.98] flex items-center justify-center gap-2"
               >
@@ -99,7 +109,7 @@ const Index = () => {
                 ) : csvDone ? (
                   <><CheckCircle2 className="w-4 h-4" /> Done — Download Started</>
                 ) : (
-                  "Process & Download CSV"
+                  "Configure Tags & Process"
                 )}
               </button>
             </div>
@@ -130,6 +140,13 @@ const Index = () => {
           </motion.div>
         </div>
       </main>
+
+      <TagConfigModal
+        open={tagModalOpen}
+        onClose={() => setTagModalOpen(false)}
+        onConfirm={handleTagConfirm}
+        availableColumns={csvColumns}
+      />
     </div>
   );
 };
