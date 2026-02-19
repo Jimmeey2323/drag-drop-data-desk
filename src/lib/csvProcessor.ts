@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { TagRule } from "@/components/TagConfigModal";
 
 interface RawRow {
   [key: string]: string;
@@ -13,14 +14,6 @@ interface ProcessedRow {
   tags: string;
 }
 
-function getTag(): string {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const yyyy = now.getFullYear();
-  return `${mm}/${dd}/${yyyy} AM`;
-}
-
 function findCol(headers: string[], candidates: string[]): string | undefined {
   const lower = headers.map((h) => h.trim().toLowerCase());
   for (const c of candidates) {
@@ -32,22 +25,57 @@ function findCol(headers: string[], candidates: string[]): string | undefined {
 
 function formatPhone(raw: string): string {
   if (!raw) return "";
-  // Remove +, spaces, dashes, parens, dots, then strip decimal
   let cleaned = raw.replace(/[+\s\-().]/g, "");
-  // If it has a decimal (e.g. from Excel), strip it
   if (cleaned.includes(".")) {
     cleaned = cleaned.split(".")[0];
   }
-  // Remove any remaining non-digit
   cleaned = cleaned.replace(/\D/g, "");
   return cleaned;
 }
 
-export function processCSVFiles(files: File[]): Promise<void> {
+function computeTags(row: RawRow, rules: TagRule[]): string {
+  const tags: string[] = [];
+
+  for (const rule of rules) {
+    if (!rule.tag.trim()) continue;
+
+    if (rule.type === "static") {
+      tags.push(rule.tag.trim());
+    } else if (rule.type === "non_empty" && rule.column) {
+      const val = (row[rule.column] || "").trim();
+      if (val !== "") {
+        tags.push(rule.tag.trim());
+      }
+    } else if (rule.type === "value_match" && rule.column && rule.value) {
+      const val = (row[rule.column] || "").trim().toLowerCase();
+      if (val.includes(rule.value.trim().toLowerCase())) {
+        tags.push(rule.tag.trim());
+      }
+    }
+  }
+
+  return tags.join(", ");
+}
+
+export function extractColumnsFromCSVFiles(files: File[]): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    // Read columns from the first file
+    if (!files.length) { resolve([]); return; }
+    Papa.parse<RawRow>(files[0], {
+      header: true,
+      preview: 1,
+      complete: (result) => {
+        resolve(result.meta.fields || []);
+      },
+      error: (err) => reject(err),
+    });
+  });
+}
+
+export function processCSVFiles(files: File[], tagRules: TagRule[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const allRows: ProcessedRow[] = [];
     let completed = 0;
-    const tag = getTag();
 
     files.forEach((file) => {
       Papa.parse<RawRow>(file, {
@@ -55,7 +83,6 @@ export function processCSVFiles(files: File[]): Promise<void> {
         skipEmptyLines: true,
         complete: (result) => {
           const headers = result.meta.fields || [];
-          const userIdCol = findCol(headers, ["userId", "user id", "user_id", "id"]);
           const firstNameCol = findCol(headers, ["firstName", "first name", "first_name", "firstname"]);
           const lastNameCol = findCol(headers, ["lastName", "last name", "last_name", "lastname"]);
           const emailCol = findCol(headers, ["email", "e-mail", "email address"]);
@@ -63,15 +90,18 @@ export function processCSVFiles(files: File[]): Promise<void> {
 
           for (const row of result.data) {
             const phoneVal = phoneCol ? (row[phoneCol] || "").trim() : "";
-            if (!phoneVal) continue; // skip rows with empty phone
+            if (!phoneVal) continue;
+
+            const formattedPhone = formatPhone(phoneVal);
+            const tags = computeTags(row, tagRules);
 
             allRows.push({
-              userId: userIdCol ? (row[userIdCol] || "").trim() : "",
+              userId: formattedPhone,
               firstName: firstNameCol ? (row[firstNameCol] || "").trim() : "",
               lastName: lastNameCol ? (row[lastNameCol] || "").trim() : "",
               email: emailCol ? (row[emailCol] || "").trim() : "",
-              phone: formatPhone(phoneVal),
-              tags: tag,
+              phone: formattedPhone,
+              tags,
             });
           }
 
