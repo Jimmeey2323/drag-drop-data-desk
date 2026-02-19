@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, X, FileText, FileSpreadsheet } from "lucide-react";
+import { Upload, X, FileText, FileSpreadsheet, ImageIcon } from "lucide-react";
 
 interface DropZoneProps {
-  type: "csv" | "pdf";
+  type: "csv" | "pdf" | "image";
   files: File[];
   onFilesAdded: (files: File[]) => void;
   onFileRemove: (index: number) => void;
@@ -14,9 +14,13 @@ const DropZone = ({ type, files, onFilesAdded, onFileRemove, processing }: DropZ
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isCsv = type === "csv";
-  const accept = isCsv ? ".csv" : ".pdf";
-  const label = isCsv ? "CSV Files" : "PDF Files";
-  const Icon = isCsv ? FileSpreadsheet : FileText;
+  const isPdf = type === "pdf";
+  const isImage = type === "image";
+  const accept = isCsv ? ".csv" : isPdf ? ".pdf" : "image/*";
+  const label = isCsv ? "CSV Files" : isPdf ? "PDF Files" : "Image Files";
+  const Icon = isCsv ? FileSpreadsheet : isPdf ? FileText : ImageIcon;
+  const colorVar = isCsv ? "--csv-color" : isPdf ? "--pdf-color" : "--img-color";
+  const dropZoneClass = isCsv ? "drop-zone-csv" : isPdf ? "drop-zone-pdf" : "drop-zone-img";
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -41,7 +45,7 @@ const DropZone = ({ type, files, onFilesAdded, onFileRemove, processing }: DropZ
       e.stopPropagation();
       setDragging(false);
       const droppedFiles = Array.from(e.dataTransfer.files).filter((f) =>
-        isCsv ? f.name.endsWith(".csv") : f.name.endsWith(".pdf")
+        isCsv ? f.name.endsWith(".csv") : isPdf ? f.name.endsWith(".pdf") : f.type.startsWith("image/")
       );
       if (droppedFiles.length) onFilesAdded(droppedFiles);
     },
@@ -59,7 +63,8 @@ const DropZone = ({ type, files, onFilesAdded, onFileRemove, processing }: DropZ
     <div className="flex flex-col gap-4 flex-1 min-w-0">
       <div className="flex items-center gap-2.5">
         <div
-          className={`w-2.5 h-2.5 rounded-full ${isCsv ? "bg-[hsl(var(--csv-color))]" : "bg-[hsl(var(--pdf-color))]"}`}
+          className={`w-2.5 h-2.5 rounded-full`}
+          style={{ background: `hsl(var(${colorVar}))` }}
         />
         <h2 className="text-lg font-semibold tracking-tight">{label}</h2>
         {files.length > 0 && (
@@ -70,7 +75,7 @@ const DropZone = ({ type, files, onFilesAdded, onFileRemove, processing }: DropZ
       </div>
 
       <div
-        className={`${isCsv ? "drop-zone-csv" : "drop-zone-pdf"} ${dragging ? "dragging" : ""} relative flex flex-col items-center justify-center p-8 min-h-[220px] cursor-pointer`}
+        className={`${dropZoneClass} ${dragging ? "dragging" : ""} relative flex flex-col items-center justify-center p-8 min-h-[220px] cursor-pointer`}
         onDragEnter={handleDragIn}
         onDragLeave={handleDragOut}
         onDragOver={handleDrag}
@@ -90,12 +95,13 @@ const DropZone = ({ type, files, onFilesAdded, onFileRemove, processing }: DropZ
           transition={{ type: "spring", stiffness: 300 }}
         >
           <Upload
-            className={`w-10 h-10 mb-3 ${isCsv ? "text-[hsl(var(--csv-color))]" : "text-[hsl(var(--pdf-color))]"} opacity-60`}
+            className="w-10 h-10 mb-3 opacity-60"
+            style={{ color: `hsl(var(${colorVar}))` }}
           />
         </motion.div>
         <p className="text-sm text-muted-foreground text-center">
-          Drop <span className="font-semibold text-foreground">.{type}</span> files here or{" "}
-          <span className={`font-semibold ${isCsv ? "text-[hsl(var(--csv-color))]" : "text-[hsl(var(--pdf-color))]"}`}>
+          Drop <span className="font-semibold text-foreground">{isImage ? "image" : `.${type}`}</span> files here or{" "}
+          <span className="font-semibold" style={{ color: `hsl(var(${colorVar}))` }}>
             browse
           </span>
         </p>
@@ -118,7 +124,7 @@ const DropZone = ({ type, files, onFilesAdded, onFileRemove, processing }: DropZ
                 transition={{ delay: i * 0.05 }}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-secondary/50 group"
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isCsv ? "text-[hsl(var(--csv-color))]" : "text-[hsl(var(--pdf-color))]"}`} />
+                <Icon className="w-4 h-4 shrink-0" style={{ color: `hsl(var(${colorVar}))` }} />
                 <span className="text-xs font-mono truncate flex-1">{file.name}</span>
                 <span className="text-[10px] text-muted-foreground font-mono">
                   {(file.size / 1024).toFixed(0)}KB

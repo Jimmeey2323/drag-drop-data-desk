@@ -40,6 +40,8 @@
     --csv-glow: 165 80% 48% / 0.15;
     --pdf-color: 0 85% 60%;
     --pdf-glow: 0 85% 60% / 0.15;
+    --img-color: 45 90% 55%;
+    --img-glow: 45 90% 55% / 0.15;
 
     --drop-zone-border: 225 15% 22%;
     --drop-zone-bg: 225 20% 10%;
@@ -104,5 +106,22 @@
 
   .glow-pdf {
     box-shadow: 0 0 20px hsl(var(--pdf-glow));
+  }
+
+  .drop-zone-img {
+    @apply border-2 border-dashed rounded-xl transition-all duration-300;
+    border-color: hsl(var(--drop-zone-border));
+    background: hsl(var(--drop-zone-bg));
+  }
+
+  .drop-zone-img.dragging,
+  .drop-zone-img:hover {
+    border-color: hsl(var(--img-color));
+    background: hsl(var(--img-glow));
+    box-shadow: 0 0 40px hsl(var(--img-glow)), inset 0 0 40px hsl(var(--img-glow));
+  }
+
+  .glow-img {
+    box-shadow: 0 0 20px hsl(var(--img-glow));
   }
 }
